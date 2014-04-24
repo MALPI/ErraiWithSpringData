@@ -1,0 +1,80 @@
+apply plugin: 'java'
+apply plugin: 'war'
+apply plugin: 'eclipse'
+
+repositories {
+    mavenCentral()
+    maven { url 'http://repository.jboss.org/nexus/content/groups/public-jboss/'}
+    maven { url 'https://repository.jboss.org/nexus/content/repositories/releases/'}
+}
+
+dependencies {
+    compile 'org.jboss.errai:errai-javaee-all:2.4.0.Final',
+            'javax:javaee-api:7.0',
+            'org.springframework.data:spring-data-jpa:1.4.3.RELEASE',
+            'org.hibernate:hibernate-entitymanager:4.1.9.Final',
+            'org.hibernate:hibernate-validator:4.3.0.Final',
+            'org.springframework:spring-core:3.1.4.RELEASE',
+            'org.springframework:spring-context:3.1.4.RELEASE',
+            'org.springframework:spring-aspects:3.1.4.RELEASE',
+            'com.google.gwt:gwt-dev:2.5.1',
+            'ch.qos.logback:logback-classic:1.0.13',
+            'ch.qos.logback:logback-core:1.0.13',
+            'ch.qos.logback:log4j-bridge:0.9.7'
+
+    testCompile 'org.springframework:spring-test:3.1.4.RELEASE',
+                'junit:junit:4.11'
+
+    testRuntime 'com.h2database:h2:1.3.175'
+}
+
+task compileGwt (dependsOn: classes, type: JavaExec) {
+    buildDir = "${project.buildDir}/gwt"
+    extraDir = "${project.buildDir}/extra"
+    inputs.source sourceSets.main.java.srcDirs
+    inputs.dir sourceSets.main.output.resourcesDir
+    outputs.dir buildDir
+    // Workaround for incremental build (GRADLE-1483)
+    outputs.upToDateSpec = new org.gradle.api.specs.AndSpec()
+    doFirst {
+        file(buildDir).mkdirs()
+    }
+
+    main = 'com.google.gwt.dev.Compiler'
+    classpath {
+        [
+                sourceSets.main.java.srcDirs, // Java source
+                sourceSets.main.output.resourcesDir, // Generated resources
+                sourceSets.main.output.classesDir, // Generated classes
+                sourceSets.main.compileClasspath, // Deps
+        ]
+    }
+    args =
+            [
+                    'de.coderebell.tts.app', // Your GWT module
+                    '-war', buildDir,
+                    '-logLevel', 'INFO',
+                    '-localWorkers', '2',
+                    '-compileReport',
+                    '-extra', extraDir
+            ]
+    maxHeapSize = '256M'
+}
+
+war.dependsOn compileGwt
+
+war {
+    from "$buildDir/gwt"
+    from "$buildDir/extra"
+}
+
+eclipse {
+    project {
+        natures 'com.google.gwt.eclipse.core.gwtNature'
+        buildCommand 'com.google.gdt.eclipse.core.webAppProjectValidator'
+        buildCommand 'com.google.gwt.eclipse.core.gwtProjectValidator'
+    }
+    classpath {
+        containers 'com.google.gwt.eclipse.core.GWT_CONTAINER'
+    }
+}
